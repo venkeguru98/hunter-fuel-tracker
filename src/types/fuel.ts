@@ -13,11 +13,12 @@ export interface FuelEntry {
   updatedAt?: number;
 
   // Calculated fields (populated by calculation engine)
-  calculatedMileage?: number; // km/l (for full tank entries where previous full tank exists)
+  calculatedMileage?: number; // km/l (for full tank entries or leg intervals)
   distanceTravelled?: number; // km travelled in this interval
   costPerKm?: number; // ₹/km
-  isPendingMileage?: boolean; // true if partial or waiting for full refill
-  mileageReason?: string; // explanation if pending
+  isPendingMileage?: boolean; // true if baseline anchor
+  mileageReason?: string; // explanation
+  isPartialEstimate?: boolean; // true if calculated from partial fill
 }
 
 export interface MotorcycleProfile {
@@ -28,6 +29,7 @@ export interface MotorcycleProfile {
   fuelCapacityLitres: number;
   initialOdometer: number;
   registrationNumber?: string;
+  customPhotoUrl?: string; // Base64 compressed image from phone gallery
 }
 
 export interface AppSettings {

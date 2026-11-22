@@ -1,8 +1,9 @@
 import { FuelEntry, FuelStats, MonthlyExpense, MileageDataPoint, MotorcycleProfile } from '../types/fuel';
 
 /**
- * Enriches and calculates accurate mileage for a list of fuel entries.
- * Entries can be passed in any order; they will be sorted chronologically by odometer & date.
+ * Enriches and calculates accurate mileage for every fuel entry.
+ * Supports BOTH full-tank refills and partial top-ups!
+ * Calculates leg-by-leg interval mileage as well as full-tank anchor intervals.
  */
 export function calculateFuelIntervals(
   entries: FuelEntry[],
@@ -19,77 +20,94 @@ export function calculateFuelIntervals(
   });
 
   let lastFullTankIndex: number | null = null;
-  let intermediateLitres = 0;
-  let intermediateCost = 0;
+  let intermediateLitresSinceFull = 0;
+  let intermediateCostSinceFull = 0;
 
   const result: FuelEntry[] = sorted.map((entry, index) => {
     const updated: FuelEntry = { ...entry };
 
-    if (entry.fuelType === 'partial') {
-      // Partial refill: cannot determine exact fuel consumed yet
+    // First entry in history establishes the starting baseline odometer
+    if (index === 0) {
       updated.calculatedMileage = undefined;
       updated.distanceTravelled = undefined;
       updated.costPerKm = undefined;
       updated.isPendingMileage = true;
-      updated.mileageReason = 'Partial refill – mileage recorded at next full tank';
+      updated.isPartialEstimate = entry.fuelType === 'partial';
+      updated.mileageReason = 'First refuel baseline logged — mileage calculates from your 2nd refuel onward';
 
-      if (lastFullTankIndex !== null) {
-        intermediateLitres += entry.litres;
-        intermediateCost += entry.totalCost;
+      if (entry.fuelType === 'full') {
+        lastFullTankIndex = 0;
+        intermediateLitresSinceFull = 0;
+        intermediateCostSinceFull = 0;
       }
       return updated;
     }
 
-    // It's a full tank entry!
-    if (lastFullTankIndex === null) {
-      // First full tank anchor in history
-      updated.calculatedMileage = undefined;
-      updated.distanceTravelled = undefined;
-      updated.costPerKm = undefined;
-      updated.isPendingMileage = true;
-      updated.mileageReason = 'Baseline full-tank established – next full refill will show mileage';
-      lastFullTankIndex = index;
-      intermediateLitres = 0;
-      intermediateCost = 0;
-      return updated;
-    }
+    const prevEntry = sorted[index - 1];
+    const legDistance = entry.odometer - prevEntry.odometer;
 
-    const prevFullEntry = sorted[lastFullTankIndex];
-    const distance = entry.odometer - prevFullEntry.odometer;
-
-    if (distance <= 0) {
+    if (legDistance <= 0) {
       updated.calculatedMileage = undefined;
       updated.distanceTravelled = 0;
       updated.costPerKm = undefined;
       updated.isPendingMileage = true;
-      updated.mileageReason = 'Odometer reading must be higher than previous full tank';
-      lastFullTankIndex = index;
-      intermediateLitres = 0;
-      intermediateCost = 0;
+      updated.mileageReason = 'Odometer reading must be higher than previous refill';
       return updated;
     }
 
-    // Total fuel consumed to bring the tank back to full = all partials in between + this refill
-    const totalLitresConsumed = intermediateLitres + entry.litres;
-    const totalIntervalCost = intermediateCost + entry.totalCost;
+    // Check if we can calculate full-tank to full-tank block mileage
+    if (entry.fuelType === 'full' && lastFullTankIndex !== null) {
+      const prevFull = sorted[lastFullTankIndex];
+      const blockDistance = entry.odometer - prevFull.odometer;
+      const totalBlockLitres = intermediateLitresSinceFull + entry.litres;
+      const totalBlockCost = intermediateCostSinceFull + entry.totalCost;
 
-    if (totalLitresConsumed > 0) {
-      const rawMileage = distance / totalLitresConsumed;
+      if (totalBlockLitres > 0 && blockDistance > 0) {
+        const rawMileage = blockDistance / totalBlockLitres;
+        updated.calculatedMileage = Math.round(rawMileage * 10) / 10;
+        updated.distanceTravelled = blockDistance;
+        updated.costPerKm = Math.round((totalBlockCost / blockDistance) * 100) / 100;
+        updated.isPendingMileage = false;
+        updated.isPartialEstimate = false;
+        updated.mileageReason = intermediateLitresSinceFull > 0
+          ? `Full-tank verified (${blockDistance} km across partial top-ups)`
+          : 'Full-tank verified interval';
+
+        // Reset trackers
+        lastFullTankIndex = index;
+        intermediateLitresSinceFull = 0;
+        intermediateCostSinceFull = 0;
+        return updated;
+      }
+    }
+
+    // Standard Leg Mileage (supported for ALL refills, including partial fills!):
+    // Leg Mileage = Distance travelled since last refuel / Litres filled
+    if (entry.litres > 0) {
+      const rawMileage = legDistance / entry.litres;
       updated.calculatedMileage = Math.round(rawMileage * 10) / 10;
-      updated.distanceTravelled = distance;
-      updated.costPerKm = Math.round((totalIntervalCost / distance) * 100) / 100;
+      updated.distanceTravelled = legDistance;
+      updated.costPerKm = Math.round((entry.totalCost / legDistance) * 100) / 100;
       updated.isPendingMileage = false;
-      updated.mileageReason = undefined;
+      updated.isPartialEstimate = entry.fuelType === 'partial';
+      updated.mileageReason = entry.fuelType === 'partial'
+        ? `Partial refill interval (${legDistance} km / ${entry.litres.toFixed(1)} L)`
+        : `Full refill interval (${legDistance} km / ${entry.litres.toFixed(1)} L)`;
     } else {
       updated.calculatedMileage = undefined;
       updated.isPendingMileage = true;
-      updated.mileageReason = 'Invalid fuel volume';
+      updated.mileageReason = 'Invalid fuel litres';
     }
 
-    // Reset trackers for the next interval
-    lastFullTankIndex = index;
-    intermediateLitres = 0;
-    intermediateCost = 0;
+    // Track for full tank anchors if relevant
+    if (entry.fuelType === 'full') {
+      lastFullTankIndex = index;
+      intermediateLitresSinceFull = 0;
+      intermediateCostSinceFull = 0;
+    } else if (lastFullTankIndex !== null) {
+      intermediateLitresSinceFull += entry.litres;
+      intermediateCostSinceFull += entry.totalCost;
+    }
 
     return updated;
   });
@@ -134,7 +152,6 @@ export function calculateFuelStats(
   let fullTanks = 0;
   let partialFills = 0;
 
-  // For weighted average mileage: sum of all valid interval distances / sum of interval litres
   let validIntervalTotalDistance = 0;
   let validIntervalTotalLitres = 0;
 
@@ -163,9 +180,7 @@ export function calculateFuelStats(
       }
 
       validIntervalTotalDistance += entry.distanceTravelled;
-      // Calculate interval litres: distance / mileage
-      const intervalLitres = entry.distanceTravelled / entry.calculatedMileage;
-      validIntervalTotalLitres += intervalLitres;
+      validIntervalTotalLitres += entry.litres;
     }
   }
 
@@ -173,10 +188,12 @@ export function calculateFuelStats(
   const baseline = initialOdo > 0 && initialOdo < minOdo ? initialOdo : minOdo;
   const totalDistance = Math.max(0, maxOdo - baseline);
 
-  // Weighted average mileage
+  // Weighted average mileage across all valid intervals
   let averageMileage: number | null = null;
   if (validIntervalTotalLitres > 0 && validIntervalTotalDistance > 0) {
     averageMileage = Math.round((validIntervalTotalDistance / validIntervalTotalLitres) * 10) / 10;
+  } else if (totalDistance > 0 && totalLitres > 0 && sorted.length > 1) {
+    averageMileage = Math.round((totalDistance / totalLitres) * 10) / 10;
   }
 
   // Average cost per km
@@ -203,7 +220,7 @@ export function calculateFuelStats(
 }
 
 /**
- * Prepares chart data points for mileage trends over time
+ * Prepares chart data points for mileage trends over time (supports all refuels!)
  */
 export function getMileageTrendData(enrichedEntries: FuelEntry[]): MileageDataPoint[] {
   const sorted = [...enrichedEntries].sort((a, b) => a.odometer - b.odometer);

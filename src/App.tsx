@@ -118,6 +118,15 @@ export const App: React.FC = () => {
               bikeProfile={settings.bikeProfile}
               stats={stats}
               onEditProfile={() => setIsBikeModalOpen(true)}
+              onUpdatePhoto={(photoUrl) => {
+                updateSettings({
+                  bikeProfile: {
+                    ...settings.bikeProfile,
+                    customPhotoUrl: photoUrl,
+                  },
+                });
+                showToast(photoUrl ? 'Motorcycle photo saved' : 'Reset to vector illustration');
+              }}
             />
 
             {/* Instrument Cluster Dial (Latest Mileage) */}

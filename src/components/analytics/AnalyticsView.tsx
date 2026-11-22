@@ -154,7 +154,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ entries, stats }) 
                 Mileage Trend (km/l)
               </h3>
               <span className="text-[10px] font-mono text-hunter-lime font-bold">
-                Consecutive Full Tanks
+                Refuel Intervals (Full & Partial)
               </span>
             </div>
 
@@ -222,7 +222,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ entries, stats }) 
               </div>
             ) : (
               <p className="text-xs text-slate-400 py-12 text-center">
-                Need at least 2 full-tank entries to graph mileage trend.
+                Need at least 2 refuels to graph mileage trend.
               </p>
             )}
           </div>

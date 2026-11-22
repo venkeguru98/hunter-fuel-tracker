@@ -7,61 +7,74 @@ function calculateFuelIntervals(entries) {
   });
 
   let lastFullTankIndex = null;
-  let intermediateLitres = 0;
-  let intermediateCost = 0;
+  let intermediateLitresSinceFull = 0;
+  let intermediateCostSinceFull = 0;
 
   return sorted.map((entry, index) => {
     const updated = { ...entry };
 
-    if (entry.fuelType === 'partial') {
+    if (index === 0) {
       updated.calculatedMileage = undefined;
       updated.distanceTravelled = undefined;
       updated.isPendingMileage = true;
-      updated.mileageReason = 'Partial refill – mileage recorded at next full tank';
-      if (lastFullTankIndex !== null) {
-        intermediateLitres += entry.litres;
-        intermediateCost += entry.totalCost;
+      updated.mileageReason = 'First refuel baseline logged';
+      if (entry.fuelType === 'full') {
+        lastFullTankIndex = 0;
       }
       return updated;
     }
 
-    if (lastFullTankIndex === null) {
+    const prevEntry = sorted[index - 1];
+    const legDistance = entry.odometer - prevEntry.odometer;
+
+    if (legDistance <= 0) {
       updated.calculatedMileage = undefined;
-      updated.distanceTravelled = undefined;
+      updated.distanceTravelled = 0;
       updated.isPendingMileage = true;
-      updated.mileageReason = 'Baseline full-tank established';
-      lastFullTankIndex = index;
-      intermediateLitres = 0;
-      intermediateCost = 0;
       return updated;
     }
 
-    const prevFullEntry = sorted[lastFullTankIndex];
-    const distance = entry.odometer - prevFullEntry.odometer;
+    // Full tank block calculation if applicable
+    if (entry.fuelType === 'full' && lastFullTankIndex !== null) {
+      const prevFull = sorted[lastFullTankIndex];
+      const blockDistance = entry.odometer - prevFull.odometer;
+      const totalBlockLitres = intermediateLitresSinceFull + entry.litres;
+      const totalBlockCost = intermediateCostSinceFull + entry.totalCost;
 
-    if (distance <= 0) {
-      updated.calculatedMileage = undefined;
-      updated.isPendingMileage = true;
-      lastFullTankIndex = index;
-      intermediateLitres = 0;
-      intermediateCost = 0;
-      return updated;
+      if (totalBlockLitres > 0 && blockDistance > 0) {
+        const rawMileage = blockDistance / totalBlockLitres;
+        updated.calculatedMileage = Math.round(rawMileage * 10) / 10;
+        updated.distanceTravelled = blockDistance;
+        updated.costPerKm = Math.round((totalBlockCost / blockDistance) * 100) / 100;
+        updated.isPendingMileage = false;
+        updated.isPartialEstimate = false;
+
+        lastFullTankIndex = index;
+        intermediateLitresSinceFull = 0;
+        intermediateCostSinceFull = 0;
+        return updated;
+      }
     }
 
-    const totalLitresConsumed = intermediateLitres + entry.litres;
-    const totalIntervalCost = intermediateCost + entry.totalCost;
-
-    if (totalLitresConsumed > 0) {
-      const rawMileage = distance / totalLitresConsumed;
+    // Standard leg calculation (supports all refills, including partial fills!)
+    if (entry.litres > 0) {
+      const rawMileage = legDistance / entry.litres;
       updated.calculatedMileage = Math.round(rawMileage * 10) / 10;
-      updated.distanceTravelled = distance;
-      updated.costPerKm = Math.round((totalIntervalCost / distance) * 100) / 100;
+      updated.distanceTravelled = legDistance;
+      updated.costPerKm = Math.round((entry.totalCost / legDistance) * 100) / 100;
       updated.isPendingMileage = false;
+      updated.isPartialEstimate = entry.fuelType === 'partial';
     }
 
-    lastFullTankIndex = index;
-    intermediateLitres = 0;
-    intermediateCost = 0;
+    if (entry.fuelType === 'full') {
+      lastFullTankIndex = index;
+      intermediateLitresSinceFull = 0;
+      intermediateCostSinceFull = 0;
+    } else if (lastFullTankIndex !== null) {
+      intermediateLitresSinceFull += entry.litres;
+      intermediateCostSinceFull += entry.totalCost;
+    }
+
     return updated;
   });
 }
@@ -89,7 +102,7 @@ function calculateFuelStats(enrichedEntries) {
       if (bestMileage === null || entry.calculatedMileage > bestMileage) bestMileage = entry.calculatedMileage;
       if (lowestMileage === null || entry.calculatedMileage < lowestMileage) lowestMileage = entry.calculatedMileage;
       validIntervalTotalDistance += entry.distanceTravelled;
-      validIntervalTotalLitres += (entry.distanceTravelled / entry.calculatedMileage);
+      validIntervalTotalLitres += entry.litres;
     }
   }
 
@@ -124,9 +137,9 @@ function assert(cond, msg) {
   }
 }
 
-console.log('=== TEST SUITE: HUNTER 350 CALCULATION & DATA LOGIC ===\n');
+console.log('=== TEST SUITE: HUNTER 350 CALCULATION & PARTIAL FILL SUPPORT ===\n');
 
-// 1. SPECIFICATION CASE
+// 1. SPECIFICATION CONSECUTIVE FULL TANK
 const specEntries = [
   { id: '1', date: '2026-11-01', odometer: 5000, litres: 11.0, totalCost: 1127.5, fuelType: 'full' },
   { id: '2', date: '2026-11-08', odometer: 5280, litres: 10.0, totalCost: 1025.0, fuelType: 'full' },
@@ -135,23 +148,32 @@ const specRes = calculateFuelIntervals(specEntries);
 assert(specRes[1].distanceTravelled === 280, 'Distance is 280 km (5280 - 5000)');
 assert(specRes[1].calculatedMileage === 28.0, 'Calculated mileage is exactly 28.0 km/l');
 
-// 2. INTERMEDIATE PARTIAL CASE
-const partialEntries = [
+// 2. USER SCENARIO: PURELY PARTIAL PETROL FILLS (No full tank)
+const partialOnlyEntries = [
+  { id: '1', date: '2026-11-01', odometer: 5000, litres: 4.0, totalCost: 400, fuelType: 'partial' },
+  { id: '2', date: '2026-11-05', odometer: 5140, litres: 4.0, totalCost: 400, fuelType: 'partial' }, // 140km / 4L = 35.0 km/l
+  { id: '3', date: '2026-11-10', odometer: 5290, litres: 4.0, totalCost: 400, fuelType: 'partial' }, // 150km / 4L = 37.5 km/l
+];
+const partialOnlyRes = calculateFuelIntervals(partialOnlyEntries);
+assert(partialOnlyRes[0].isPendingMileage === true, 'First partial entry establishes baseline');
+assert(partialOnlyRes[1].calculatedMileage === 35.0, '2nd partial entry calculates 35.0 km/l mileage immediately');
+assert(partialOnlyRes[1].distanceTravelled === 140, 'Leg distance is 140 km');
+assert(partialOnlyRes[2].calculatedMileage === 37.5, '3rd partial entry calculates 37.5 km/l mileage');
+
+const partialStats = calculateFuelStats(partialOnlyRes);
+assert(partialStats.latestMileage === 37.5, 'Latest mileage shows 37.5 km/l without requiring full tank');
+assert(partialStats.averageMileage === 36.3, 'Average mileage computed for partial fills (290km / 8L = 36.3 km/l)');
+assert(partialStats.totalDistance === 290, 'Total distance tracked is 290 km');
+
+// 3. MIXED PARTIAL + FULL
+const mixedEntries = [
   { id: '1', date: '2026-11-01', odometer: 5000, litres: 10.0, totalCost: 1000, fuelType: 'full' },
   { id: '2', date: '2026-11-04', odometer: 5150, litres: 5.0, totalCost: 500, fuelType: 'partial' },
   { id: '3', date: '2026-11-08', odometer: 5300, litres: 6.0, totalCost: 600, fuelType: 'full' },
 ];
-const partialRes = calculateFuelIntervals(partialEntries);
-assert(partialRes[1].isPendingMileage === true, 'Partial refill is marked pending');
-assert(partialRes[2].distanceTravelled === 300, 'Distance across partial fill is 300 km');
-assert(partialRes[2].calculatedMileage === 27.3, 'Fuel consumed correctly totals 11L -> 27.3 km/l');
-
-// 3. STATS AGGREGATION
-const statsRes = calculateFuelStats(partialRes);
-assert(statsRes.totalDistance === 300, 'Total distance tracked is 300 km');
-assert(statsRes.totalFuelLitres === 21.0, 'Total fuel volume is 21.0 L');
-assert(statsRes.totalExpenditure === 2100, 'Total expenditure is ₹2100');
-assert(statsRes.latestMileage === 27.3, 'Latest mileage is 27.3 km/l');
+const mixedRes = calculateFuelIntervals(mixedEntries);
+assert(mixedRes[1].calculatedMileage === 30.0, 'Partial leg calculates 30.0 km/l (150km / 5L)');
+assert(mixedRes[2].calculatedMileage === 27.3, 'Full tank block calculates 27.3 km/l (300km / 11L)');
 
 console.log(`\n=== ALL TESTS COMPLETED: ${passed} PASSED, ${failed} FAILED ===`);
 if (failed > 0) process.exit(1);

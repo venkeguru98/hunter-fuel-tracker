@@ -1,24 +1,52 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { MotorcycleProfile, FuelStats } from '../../types/fuel';
 import { formatDistance, formatOdometer } from '../../utils/formatters';
-import { MapPin, ShieldCheck, Fuel } from 'lucide-react';
+import { compressImage } from '../../utils/imageCompressor';
+import { MapPin, ShieldCheck, Fuel, Camera, Image as ImageIcon, RotateCcw } from 'lucide-react';
 
 interface BikeProfileCardProps {
   bikeProfile: MotorcycleProfile;
   stats: FuelStats;
   onEditProfile?: () => void;
+  onUpdatePhoto?: (photoUrl: string | undefined) => void;
 }
 
 export const BikeProfileCard: React.FC<BikeProfileCardProps> = ({
   bikeProfile,
   stats,
   onEditProfile,
+  onUpdatePhoto,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onUpdatePhoto) return;
+
+    try {
+      const compressedDataUrl = await compressImage(file, 1000, 0.82);
+      onUpdatePhoto(compressedDataUrl);
+    } catch (err) {
+      console.error('Failed to compress selected image:', err);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   return (
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-b from-graphite-850 to-graphite-900 dark:from-graphite-850 dark:to-graphite-900 bg-white border border-graphite-750/70 dark:border-graphite-750/70 border-slate-200 shadow-card-dark dark:shadow-card-dark shadow-card-light p-4 transition-all">
       {/* Background Subtle Gradient & Carbon Fiber feel */}
       <div className="absolute top-0 right-0 w-64 h-36 bg-gradient-to-bl from-hunter-lime/10 via-transparent to-transparent pointer-events-none rounded-tr-3xl" />
       <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+
+      {/* Hidden File Input for mobile gallery / camera */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handlePhotoSelect}
+        className="hidden"
+      />
 
       {/* Header Info */}
       <div className="flex items-start justify-between relative z-10">
@@ -54,120 +82,163 @@ export const BikeProfileCard: React.FC<BikeProfileCardProps> = ({
         </button>
       </div>
 
-      {/* Hunter 350 Tasteful Stylized Silhouette Graphic */}
-      <div className="my-3 py-1 flex items-center justify-center relative">
-        <svg
-          viewBox="0 0 360 140"
-          className="w-full max-w-[320px] h-auto drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)]"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <linearGradient id="tankGrey" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#4b5563" />
-              <stop offset="40%" stop-color="#2d333e" />
-              <stop offset="100%" stop-color="#181c22" />
-            </linearGradient>
-            <linearGradient id="metalRim" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#1f2937" />
-              <stop offset="50%" stop-color="#374151" />
-              <stop offset="100%" stop-color="#111827" />
-            </linearGradient>
-            <filter id="headlightGlow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
+      {/* Visual Section: Custom Uploaded Photo OR Stylized Vector Art */}
+      {bikeProfile.customPhotoUrl ? (
+        <div className="my-3 relative group">
+          <div className="w-full h-44 sm:h-52 rounded-2xl overflow-hidden border border-graphite-700/60 shadow-lg relative bg-graphite-950">
+            <img
+              src={bikeProfile.customPhotoUrl}
+              alt="My Royal Enfield Hunter 350"
+              className="w-full h-full object-cover object-center"
+            />
+            {/* Subtle Gradient Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-graphite-950/80 via-transparent to-transparent pointer-events-none" />
 
-          {/* Ground shadow */}
-          <ellipse cx="180" cy="132" rx="140" ry="6" fill="#000000" opacity="0.6" />
+            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-graphite-900/85 backdrop-blur-md border border-graphite-700 text-[10px] font-mono font-bold text-hunter-lime">
+              My Bike
+            </div>
 
-          {/* Rear Wheel & Tyre (140/70-17) */}
-          <circle cx="75" cy="98" r="34" fill="#14171d" stroke="#090a0d" stroke-width="8" />
-          <circle cx="75" cy="98" r="28" fill="url(#metalRim)" stroke="#334155" stroke-width="2" />
-          <circle cx="75" cy="98" r="14" fill="#0f172a" stroke="#64748b" stroke-width="1.5" />
-          {/* Wheel Spokes */}
-          <line x1="75" y1="70" x2="75" y2="126" stroke="#475569" stroke-width="1.5" />
-          <line x1="47" y1="98" x2="103" y2="98" stroke="#475569" stroke-width="1.5" />
-          <line x1="55" y1="78" x2="95" y2="118" stroke="#475569" stroke-width="1.5" />
-          <line x1="55" y1="118" x2="95" y2="78" stroke="#475569" stroke-width="1.5" />
+            {/* Quick Action Overlay Buttons */}
+            <div className="absolute bottom-2 right-2 flex items-center space-x-1.5">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-2.5 py-1 rounded-xl bg-graphite-900/90 hover:bg-graphite-800 text-white text-[11px] font-bold border border-graphite-700 backdrop-blur-md flex items-center space-x-1 shadow-md active:scale-95 transition"
+              >
+                <Camera className="w-3.5 h-3.5 text-hunter-lime" />
+                <span>Change Photo</span>
+              </button>
+              {onUpdatePhoto && (
+                <button
+                  type="button"
+                  onClick={() => onUpdatePhoto(undefined)}
+                  title="Reset to default illustration"
+                  className="p-1.5 rounded-xl bg-graphite-900/90 hover:bg-graphite-800 text-slate-400 hover:text-rose-400 border border-graphite-700 backdrop-blur-md shadow-md active:scale-95 transition"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Default Hunter 350 Tasteful Stylized Silhouette Graphic */
+        <div className="my-3 py-1 flex flex-col items-center justify-center relative">
+          <svg
+            viewBox="0 0 360 140"
+            className="w-full max-w-[320px] h-auto drop-shadow-[0_10px_15px_rgba(0,0,0,0.5)]"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="tankGrey" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#4b5563" />
+                <stop offset="40%" stopColor="#2d333e" />
+                <stop offset="100%" stopColor="#181c22" />
+              </linearGradient>
+              <linearGradient id="metalRim" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#1f2937" />
+                <stop offset="50%" stopColor="#374151" />
+                <stop offset="100%" stopColor="#111827" />
+              </linearGradient>
+              <filter id="headlightGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
 
-          {/* Front Wheel & Tyre (110/70-17) */}
-          <circle cx="285" cy="98" r="34" fill="#14171d" stroke="#090a0d" stroke-width="8" />
-          <circle cx="285" cy="98" r="28" fill="url(#metalRim)" stroke="#334155" stroke-width="2" />
-          <circle cx="285" cy="98" r="14" fill="#0f172a" stroke="#64748b" stroke-width="1.5" />
-          {/* Wheel Spokes */}
-          <line x1="285" y1="70" x2="285" y2="126" stroke="#475569" stroke-width="1.5" />
-          <line x1="257" y1="98" x2="313" y2="98" stroke="#475569" stroke-width="1.5" />
-          <line x1="265" y1="78" x2="305" y2="118" stroke="#475569" stroke-width="1.5" />
-          <line x1="265" y1="118" x2="305" y2="78" stroke="#475569" stroke-width="1.5" />
+            {/* Ground shadow */}
+            <ellipse cx="180" cy="132" rx="140" ry="6" fill="#000000" opacity="0.6" />
 
-          {/* Front Telescopic Forks & Disc */}
-          <path d="M 285 98 L 246 36" stroke="#94a3b8" stroke-width="4.5" stroke-linecap="round" />
-          <path d="M 280 95 L 244 38" stroke="#475569" stroke-width="2" />
-          <circle cx="285" cy="98" r="20" fill="none" stroke="#64748b" stroke-width="2.5" stroke-dasharray="3 3" />
+            {/* Rear Wheel & Tyre (140/70-17) */}
+            <circle cx="75" cy="98" r="34" fill="#14171d" stroke="#090a0d" strokeWidth="8" />
+            <circle cx="75" cy="98" r="28" fill="url(#metalRim)" stroke="#334155" strokeWidth="2" />
+            <circle cx="75" cy="98" r="14" fill="#0f172a" stroke="#64748b" strokeWidth="1.5" />
+            <line x1="75" y1="70" x2="75" y2="126" stroke="#475569" strokeWidth="1.5" />
+            <line x1="47" y1="98" x2="103" y2="98" stroke="#475569" strokeWidth="1.5" />
+            <line x1="55" y1="78" x2="95" y2="118" stroke="#475569" strokeWidth="1.5" />
+            <line x1="55" y1="118" x2="95" y2="78" stroke="#475569" strokeWidth="1.5" />
 
-          {/* Round Headlight with vintage ring */}
-          <circle cx="258" cy="34" r="9" fill="#1e293b" stroke="#94a3b8" stroke-width="2" />
-          <circle cx="260" cy="34" r="5" fill="#fef08a" opacity="0.8" filter="url(#headlightGlow)" />
+            {/* Front Wheel & Tyre (110/70-17) */}
+            <circle cx="285" cy="98" r="34" fill="#14171d" stroke="#090a0d" strokeWidth="8" />
+            <circle cx="285" cy="98" r="28" fill="url(#metalRim)" stroke="#334155" strokeWidth="2" />
+            <circle cx="285" cy="98" r="14" fill="#0f172a" stroke="#64748b" strokeWidth="1.5" />
+            <line x1="285" y1="70" x2="285" y2="126" stroke="#475569" strokeWidth="1.5" />
+            <line x1="257" y1="98" x2="313" y2="98" stroke="#475569" strokeWidth="1.5" />
+            <line x1="265" y1="78" x2="305" y2="118" stroke="#475569" strokeWidth="1.5" />
+            <line x1="265" y1="118" x2="305" y2="78" stroke="#475569" strokeWidth="1.5" />
 
-          {/* Hunter Handlebars & Offset Single Instrument Pod */}
-          <path d="M 240 34 L 235 24 L 218 25" fill="none" stroke="#64748b" stroke-width="3.5" stroke-linecap="round" />
-          {/* Instrument Pod */}
-          <ellipse cx="232" cy="22" rx="6" ry="4" fill="#090a0d" stroke="#9ae600" stroke-width="1.5" />
+            {/* Front Telescopic Forks & Disc */}
+            <path d="M 285 98 L 246 36" stroke="#94a3b8" strokeWidth="4.5" strokeLinecap="round" />
+            <path d="M 280 95 L 244 38" stroke="#475569" strokeWidth="2" />
+            <circle cx="285" cy="98" r="20" fill="none" stroke="#64748b" strokeWidth="2.5" strokeDasharray="3 3" />
 
-          {/* Hunter 350 Teardrop Fuel Tank (Graphite Grey) */}
-          <path
-            d="M 180 40 C 205 38, 235 44, 240 54 C 238 68, 205 76, 175 72 C 160 70, 155 58, 162 48 Z"
-            fill="url(#tankGrey)"
-            stroke="#6b7280"
-            stroke-width="2"
-          />
-          {/* Lime Green Accent Strip on Tank */}
-          <path d="M 178 50 C 196 48, 222 52, 230 58" fill="none" stroke="#9ae600" stroke-width="2.5" stroke-linecap="round" />
-          <circle cx="205" cy="46" r="3.5" fill="#94a3b8" stroke="#1e293b" stroke-width="1" /> {/* Fuel Filler Cap */}
+            {/* Round Headlight */}
+            <circle cx="258" cy="34" r="9" fill="#1e293b" stroke="#94a3b8" strokeWidth="2" />
+            <circle cx="260" cy="34" r="5" fill="#fef08a" opacity="0.8" filter="url(#headlightGlow)" />
 
-          {/* Roadster Single-Piece Tuck & Roll Seat */}
-          <path
-            d="M 115 54 C 130 52, 160 52, 178 58 C 170 65, 140 68, 115 63 Z"
-            fill="#18181b"
-            stroke="#27272a"
-            stroke-width="2"
-          />
-          {/* Rear Compact Tail Fender */}
-          <path d="M 90 62 L 115 56 L 118 64 L 85 75 Z" fill="#2d333e" />
-          <circle cx="82" cy="74" r="3.5" fill="#ef4444" /> {/* Tail light */}
+            {/* Hunter Handlebars & Pod */}
+            <path d="M 240 34 L 235 24 L 218 25" fill="none" stroke="#64748b" strokeWidth="3.5" strokeLinecap="round" />
+            <ellipse cx="232" cy="22" rx="6" ry="4" fill="#090a0d" stroke="#9ae600" strokeWidth="1.5" />
 
-          {/* J-Series 349cc Engine Block & Crankcase */}
-          <rect x="145" y="70" width="48" height="38" rx="8" fill="#181b22" stroke="#334155" stroke-width="2" />
-          {/* Cooling Fins */}
-          <line x1="149" y1="76" x2="187" y2="76" stroke="#475569" stroke-width="2" />
-          <line x1="148" y1="82" x2="189" y2="82" stroke="#475569" stroke-width="2" />
-          <line x1="150" y1="88" x2="188" y2="88" stroke="#475569" stroke-width="2" />
-          {/* Royal Enfield Round Case Cover */}
-          <circle cx="166" cy="96" r="11" fill="#262c37" stroke="#94a3b8" stroke-width="1.5" />
-          <text x="166" y="99" font-size="6" fill="#9ae600" font-weight="bold" text-anchor="middle">RE</text>
+            {/* Hunter 350 Teardrop Fuel Tank */}
+            <path
+              d="M 180 40 C 205 38, 235 44, 240 54 C 238 68, 205 76, 175 72 C 160 70, 155 58, 162 48 Z"
+              fill="url(#tankGrey)"
+              stroke="#6b7280"
+              strokeWidth="2"
+            />
+            <path d="M 178 50 C 196 48, 222 52, 230 58" fill="none" stroke="#9ae600" strokeWidth="2.5" strokeLinecap="round" />
+            <circle cx="205" cy="46" r="3.5" fill="#94a3b8" stroke="#1e293b" strokeWidth="1" />
 
-          {/* Blacked-out Up-swept Roadster Exhaust Pipe */}
-          <path
-            d="M 188 78 C 196 92, 185 110, 165 110 L 110 110 C 95 110, 80 102, 70 94"
-            fill="none"
-            stroke="#1e232b"
-            stroke-width="7"
-            stroke-linecap="round"
-          />
-          <path
-            d="M 115 110 L 72 95"
-            fill="none"
-            stroke="#374151"
-            stroke-width="5"
-            stroke-linecap="round"
-          />
+            {/* Roadster Seat */}
+            <path
+              d="M 115 54 C 130 52, 160 52, 178 58 C 170 65, 140 68, 115 63 Z"
+              fill="#18181b"
+              stroke="#27272a"
+              strokeWidth="2"
+            />
+            {/* Rear Tail */}
+            <path d="M 90 62 L 115 56 L 118 64 L 85 75 Z" fill="#2d333e" />
+            <circle cx="82" cy="74" r="3.5" fill="#ef4444" />
 
-          {/* Rear Twin Shock Absorber */}
-          <line x1="90" y1="68" x2="78" y2="95" stroke="#ef4444" stroke-width="4" stroke-linecap="round" />
-          <line x1="90" y1="68" x2="78" y2="95" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="2 3" />
-        </svg>
-      </div>
+            {/* J-Series Engine Block */}
+            <rect x="145" y="70" width="48" height="38" rx="8" fill="#181b22" stroke="#334155" strokeWidth="2" />
+            <line x1="149" y1="76" x2="187" y2="76" stroke="#475569" strokeWidth="2" />
+            <line x1="148" y1="82" x2="189" y2="82" stroke="#475569" strokeWidth="2" />
+            <line x1="150" y1="88" x2="188" y2="88" stroke="#475569" strokeWidth="2" />
+            <circle cx="166" cy="96" r="11" fill="#262c37" stroke="#94a3b8" strokeWidth="1.5" />
+            <text x="166" y="99" fontSize="6" fill="#9ae600" fontWeight="bold" textAnchor="middle">RE</text>
+
+            {/* Upswept Exhaust */}
+            <path
+              d="M 188 78 C 196 92, 185 110, 165 110 L 110 110 C 95 110, 80 102, 70 94"
+              fill="none"
+              stroke="#1e232b"
+              strokeWidth="7"
+              strokeLinecap="round"
+            />
+            <path
+              d="M 115 110 L 72 95"
+              fill="none"
+              stroke="#374151"
+              strokeWidth="5"
+              strokeLinecap="round"
+            />
+            <line x1="90" y1="68" x2="78" y2="95" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" />
+            <line x1="90" y1="68" x2="78" y2="95" stroke="#ffffff" strokeWidth="1.5" strokeDasharray="2 3" />
+          </svg>
+
+          {/* Upload Button beneath illustration */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="mt-1 px-3 py-1.5 rounded-xl bg-graphite-900/90 dark:bg-graphite-900/90 bg-slate-100 hover:bg-graphite-800 text-slate-300 dark:text-slate-300 text-slate-700 hover:text-white border border-graphite-700/60 dark:border-graphite-700/60 border-slate-300 text-xs font-semibold flex items-center space-x-1.5 shadow-sm active:scale-95 transition"
+          >
+            <Camera className="w-3.5 h-3.5 text-hunter-lime" />
+            <span>Upload Photo from Gallery</span>
+          </button>
+        </div>
+      )}
 
       {/* Odometer Pod & Total Travelled Bar */}
       <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-graphite-800/80 dark:border-graphite-800/80 border-slate-200">

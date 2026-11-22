@@ -25,7 +25,7 @@ export const MileageTrendMini: React.FC<MileageTrendMiniProps> = ({
           </span>
         </div>
         <p className="text-xs text-slate-400 py-3">
-          Need at least 2 full-tank refuels to display the mileage progression curve.
+          Need at least 2 refuels (full or partial) to display the mileage progression curve.
         </p>
       </div>
     );
@@ -47,7 +47,7 @@ export const MileageTrendMini: React.FC<MileageTrendMiniProps> = ({
             <h3 className="text-xs font-bold text-white dark:text-white text-slate-900">
               Mileage Trend (km/l)
             </h3>
-            <p className="text-[10px] text-slate-400">Chronological full-tank performance</p>
+            <p className="text-[10px] text-slate-400">Chronological refuelling performance</p>
           </div>
         </div>
 
