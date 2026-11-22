@@ -24,6 +24,7 @@ interface SettingsViewProps {
   settings: AppSettings;
   entries: FuelEntry[];
   theme: 'dark' | 'light';
+  unbackedCount?: number;
   onToggleTheme: () => void;
   onUpdateSettings: (settings: Partial<AppSettings>) => void;
   onApplyImport: (entries: FuelEntry[], newSettings?: AppSettings) => void;
@@ -36,6 +37,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   settings,
   entries,
   theme,
+  unbackedCount = 0,
   onToggleTheme,
   onUpdateSettings,
   onApplyImport,
@@ -137,8 +139,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
+        {/* Backup Freshness & Cloud Safety Status */}
+        <div className="p-3 rounded-2xl bg-graphite-950/70 dark:bg-graphite-950/70 bg-slate-50 border border-graphite-800 dark:border-graphite-800 border-slate-200 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-400">Cloud Backup Status</span>
+            {settings.lastBackupDate ? (
+              <span className="font-mono text-hunter-lime font-bold flex items-center">
+                <CheckCircle2 className="w-3.5 h-3.5 mr-1 inline" />
+                Backed up {new Date(settings.lastBackupDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+              </span>
+            ) : (
+              <span className="font-mono text-amber-400 font-bold flex items-center">
+                <AlertTriangle className="w-3.5 h-3.5 mr-1 inline" />
+                Never backed up
+              </span>
+            )}
+          </div>
+
+          {unbackedCount > 0 && (
+            <div className="flex items-center justify-between text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded-xl border border-amber-500/20">
+              <span>⚠️ {unbackedCount} {unbackedCount === 1 ? 'refuel' : 'refuels'} not saved to cloud yet</span>
+              <button
+                onClick={handleExportBackup}
+                className="font-bold text-hunter-lime underline hover:text-lime-300 ml-2"
+              >
+                Backup Now
+              </button>
+            </div>
+          )}
+
+          {/* Auto-Backup on Every Refuel Toggle */}
+          <div className="flex items-center justify-between pt-1 border-t border-graphite-850 dark:border-graphite-850 border-slate-200">
+            <div>
+              <span className="text-xs font-bold text-white dark:text-white text-slate-900 block">
+                Auto-Prompt Backup on Refill
+              </span>
+              <span className="text-[10px] text-slate-400">
+                Prompts Google Drive / WhatsApp export when you add fuel
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onUpdateSettings({ autoBackupOnSave: !settings.autoBackupOnSave })}
+              className={`w-11 h-6 rounded-full transition-colors p-0.5 flex items-center ${
+                settings.autoBackupOnSave ? 'bg-hunter-lime justify-end' : 'bg-graphite-800 justify-start'
+              }`}
+            >
+              <div className="w-5 h-5 rounded-full bg-graphite-950 shadow-md" />
+            </button>
+          </div>
+        </div>
+
         <p className="text-xs text-slate-300 dark:text-slate-300 text-slate-600 leading-relaxed bg-graphite-950/60 dark:bg-graphite-950/60 bg-slate-50 p-3 rounded-2xl border border-graphite-800 dark:border-graphite-800 border-slate-200">
-          All your fuel records are stored privately inside this browser. Regularly export a JSON backup to your phone storage, Google Drive, iCloud, or share via WhatsApp to never lose your data.
+          💡 <strong>Survives Lost / Broken Phones:</strong> When you tap <strong>Export Backup</strong>, choose <em>Google Drive</em>, <em>iCloud</em>, or <em>WhatsApp</em> (message to yourself). If you ever change or lose your phone, simply import that file to restore all your records instantly!
         </p>
 
         {/* Action Buttons */}

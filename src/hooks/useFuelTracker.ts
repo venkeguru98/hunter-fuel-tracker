@@ -10,6 +10,7 @@ import {
 } from '../utils/storage';
 import { calculateFuelIntervals, calculateFuelStats } from '../utils/calculations';
 import { SAMPLE_HUNTER_ENTRIES } from '../utils/sampleData';
+import { exportBackupFile } from '../utils/exportImport';
 
 export type NavigationTab = 'dashboard' | 'history' | 'analytics' | 'settings';
 
@@ -105,13 +106,29 @@ export function useFuelTracker() {
         }
 
         // Keep sorted by odometer ascending
-        return updated.sort((a, b) => a.odometer - b.odometer);
+        const sorted = updated.sort((a, b) => a.odometer - b.odometer);
+
+        // If Auto-Backup is enabled, prompt or export backup immediately
+        if (settings.autoBackupOnSave) {
+          setTimeout(() => {
+            exportBackupFile(sorted, settings).then((res) => {
+              if (res.success) {
+                setSettings((s) => ({
+                  ...s,
+                  lastBackupDate: new Date().toISOString(),
+                }));
+              }
+            }).catch(() => {});
+          }, 400);
+        }
+
+        return sorted;
       });
 
       setIsAddModalOpen(false);
       setEditingEntry(null);
     },
-    [showToast]
+    [settings, showToast]
   );
 
   // Delete Entry with Undo capability
@@ -182,6 +199,27 @@ export function useFuelTracker() {
     [showToast]
   );
 
+  // Number of entries modified or added since last backup
+  const unbackedCount = useMemo(() => {
+    if (!settings.lastBackupDate) return entries.length;
+    const lastTime = new Date(settings.lastBackupDate).getTime();
+    return entries.filter((e) => (e.updatedAt || e.createdAt) > lastTime).length;
+  }, [entries, settings.lastBackupDate]);
+
+  const triggerBackup = useCallback(async () => {
+    const res = await exportBackupFile(entries, settings);
+    if (res.success) {
+      setSettings((prev) => ({
+        ...prev,
+        lastBackupDate: new Date().toISOString(),
+      }));
+      showToast(res.message, 'success');
+    } else {
+      showToast(res.message, 'error');
+    }
+    return res;
+  }, [entries, settings, showToast]);
+
   return {
     entries,
     enrichedEntries,
@@ -204,5 +242,7 @@ export function useFuelTracker() {
     clearAllData,
     applyImport,
     updateSettings,
+    unbackedCount,
+    triggerBackup,
   };
 }

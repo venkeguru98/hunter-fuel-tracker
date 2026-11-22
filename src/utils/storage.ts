@@ -12,6 +12,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   fuelUnit: 'litres',
   theme: 'dark',
   notificationsEnabled: true,
+  autoBackupOnSave: true,
+  lastBackupDate: undefined,
   bikeProfile: {
     make: 'Royal Enfield',
     model: 'Hunter 350',

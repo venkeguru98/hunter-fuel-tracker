@@ -41,6 +41,8 @@ export const App: React.FC = () => {
     clearAllData,
     applyImport,
     updateSettings,
+    unbackedCount,
+    triggerBackup,
   } = useFuelTracker();
 
   const [isBikeModalOpen, setIsBikeModalOpen] = useState(false);
@@ -129,6 +131,24 @@ export const App: React.FC = () => {
               }}
             />
 
+            {/* Cloud Backup Reminder when multiple unbacked refuels accumulate */}
+            {unbackedCount >= 3 && (
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between text-xs animate-in fade-in duration-150">
+                <div className="flex items-center space-x-2 min-w-0 pr-2">
+                  <span className="text-amber-400">🛡️</span>
+                  <span className="text-slate-300 text-[11px] truncate">
+                    <strong>{unbackedCount} refuels</strong> not backed up to cloud yet
+                  </span>
+                </div>
+                <button
+                  onClick={triggerBackup}
+                  className="px-2.5 py-1 rounded-xl bg-hunter-lime text-graphite-950 font-bold text-[11px] shrink-0 active:scale-95 transition"
+                >
+                  Backup Now
+                </button>
+              </div>
+            )}
+
             {/* Instrument Cluster Dial (Latest Mileage) */}
             <InstrumentDial
               stats={stats}
@@ -182,6 +202,7 @@ export const App: React.FC = () => {
             settings={settings}
             entries={enrichedEntries}
             theme={theme}
+            unbackedCount={unbackedCount}
             onToggleTheme={toggleTheme}
             onUpdateSettings={updateSettings}
             onApplyImport={applyImport}

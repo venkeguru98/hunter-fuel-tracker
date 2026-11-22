@@ -38,6 +38,8 @@ export interface AppSettings {
   fuelUnit: 'litres';
   theme: 'dark' | 'light';
   notificationsEnabled: boolean;
+  autoBackupOnSave: boolean; // Auto-trigger backup on every refuel
+  lastBackupDate?: string; // Timestamp of last successful export
   bikeProfile: MotorcycleProfile;
 }
 
